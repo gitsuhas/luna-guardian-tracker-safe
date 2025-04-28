@@ -1,0 +1,212 @@
+
+import { useState, useEffect } from "react";
+import { addDays, format } from "date-fns";
+import { v4 as uuidv4 } from "uuid";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import Navbar from "@/components/layout/Navbar";
+import PeriodCalendar from "@/components/period-tracker/PeriodCalendar";
+import CycleSettings from "@/components/period-tracker/CycleSettings";
+import PeriodTracking from "@/components/period-tracker/PeriodTracking";
+import SafetyGuidelines from "@/components/safety/SafetyGuidelines";
+import { PeriodData, savePeriodData, getPeriodDataList } from "@/lib/local-storage";
+import { calculatePeriodCycle, formatDateForDisplay, formatShortDate } from "@/lib/period-utils";
+
+const PeriodTrackerPage = () => {
+  const [lastPeriodDate, setLastPeriodDate] = useState<Date>(new Date());
+  const [cycleLength, setCycleLength] = useState<number>(28);
+  const [periodLength, setPeriodLength] = useState<number>(5);
+  const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [notes, setNotes] = useState<string>("");
+  const [periodHistory, setPeriodHistory] = useState<PeriodData[]>([]);
+  const [activeId, setActiveId] = useState<string>("");
+  
+  // Load saved period data
+  useEffect(() => {
+    const savedData = getPeriodDataList();
+    setPeriodHistory(savedData);
+    
+    if (savedData.length > 0) {
+      const latestData = savedData[savedData.length - 1];
+      setLastPeriodDate(new Date(latestData.lastPeriodStartDate));
+      setCycleLength(latestData.cycleLength);
+      setPeriodLength(latestData.periodLength);
+      setSymptoms(latestData.symptoms);
+      setNotes(latestData.notes);
+      setActiveId(latestData.id);
+    } else {
+      // Create initial data if none exists
+      const newId = uuidv4();
+      setActiveId(newId);
+    }
+  }, []);
+  
+  // Calculate next period and fertility window
+  const cycleInfo = calculatePeriodCycle(lastPeriodDate, cycleLength);
+  
+  const handleSavePeriodData = () => {
+    const periodData: PeriodData = {
+      id: activeId,
+      lastPeriodStartDate: lastPeriodDate.toISOString(),
+      cycleLength,
+      periodLength,
+      symptoms,
+      notes
+    };
+    
+    savePeriodData(periodData);
+    setPeriodHistory(getPeriodDataList());
+    toast.success("Period data saved successfully");
+  };
+  
+  const handleCreateNewPeriod = () => {
+    const newId = uuidv4();
+    setActiveId(newId);
+    setLastPeriodDate(new Date());
+    setSymptoms([]);
+    setNotes("");
+    toast.success("New period tracking started");
+  };
+  
+  const handleResetTracker = () => {
+    setLastPeriodDate(new Date());
+    setCycleLength(28);
+    setPeriodLength(5);
+    setSymptoms([]);
+    setNotes("");
+    toast.success("Tracker reset to default values");
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-1 py-6 animate-fade-in">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold">Period Tracker</h1>
+              <p className="text-muted-foreground">Track your cycle, predict periods, and manage your reproductive health</p>
+            </div>
+            <Button variant="outline" onClick={handleResetTracker}>Reset Tracker</Button>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left column - Calendar and Predictions */}
+            <div className="lg:col-span-2 space-y-6">
+              <PeriodCalendar 
+                lastPeriodDate={lastPeriodDate}
+                cycleLength={cycleLength}
+                periodLength={periodLength}
+              />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-4 bg-card rounded-lg border border-border">
+                  <h3 className="font-medium mb-3">Next Period</h3>
+                  <div className="text-xl font-bold text-purple-400">
+                    {formatDateForDisplay(cycleInfo.nextPeriodDate)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    In {cycleInfo.daysUntilNextPeriod} days
+                  </div>
+                </div>
+                
+                <div className="p-4 bg-card rounded-lg border border-border">
+                  <h3 className="font-medium mb-3">Fertility Window</h3>
+                  <div className="text-xl font-bold text-green-400">
+                    {formatShortDate(cycleInfo.fertilityWindowStart)} - {formatShortDate(cycleInfo.fertilityWindowEnd)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Ovulation: {formatShortDate(cycleInfo.ovulationDate)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Right column - Settings and Tracking */}
+            <div className="space-y-6">
+              <CycleSettings
+                lastPeriodDate={lastPeriodDate}
+                cycleLength={cycleLength}
+                periodLength={periodLength}
+                onLastPeriodDateChange={setLastPeriodDate}
+                onCycleLengthChange={setCycleLength}
+                onPeriodLengthChange={setPeriodLength}
+              />
+              
+              <PeriodTracking
+                symptoms={symptoms}
+                notes={notes}
+                onSymptomsChange={setSymptoms}
+                onNotesChange={setNotes}
+              />
+              
+              <div className="flex flex-col space-y-2">
+                <Button 
+                  onClick={handleSavePeriodData}
+                  className="w-full bg-luna-purple hover:bg-luna-purple/90 text-white"
+                >
+                  Save Period Data
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleCreateNewPeriod}
+                  className="w-full"
+                >
+                  Add Another Period Date
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Period History Display */}
+          {periodHistory.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-bold mb-4">Period History</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {periodHistory.map((period) => (
+                  <div key={period.id} className={`p-4 rounded-lg border ${period.id === activeId ? 'border-luna-purple bg-secondary' : 'border-border bg-card'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium">
+                        {format(new Date(period.lastPeriodStartDate), "MMMM d, yyyy")}
+                      </h3>
+                      {period.id !== activeId && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setLastPeriodDate(new Date(period.lastPeriodStartDate));
+                            setCycleLength(period.cycleLength);
+                            setPeriodLength(period.periodLength);
+                            setSymptoms(period.symptoms);
+                            setNotes(period.notes);
+                            setActiveId(period.id);
+                            toast.success("Period data loaded");
+                          }}
+                        >
+                          Load
+                        </Button>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <p>Cycle: {period.cycleLength} days</p>
+                      <p>Duration: {period.periodLength} days</p>
+                      {period.symptoms.length > 0 && (
+                        <p className="mt-1">Symptoms: {period.symptoms.join(", ")}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="mt-8">
+            <SafetyGuidelines />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default PeriodTrackerPage;
