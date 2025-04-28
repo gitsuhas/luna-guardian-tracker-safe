@@ -1,11 +1,10 @@
-
 import { 
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger
 } from "@/components/ui/accordion";
-import { Pregnancy } from "lucide-react";
+import { Baby } from "lucide-react";
 
 const HealthGuidelines = () => {
   const periodHealthGuidelines = [
@@ -57,7 +56,7 @@ const HealthGuidelines = () => {
   return (
     <div className="p-4 bg-card rounded-lg border border-border">
       <div className="flex items-center gap-2 mb-4">
-        <Pregnancy className="h-5 w-5 text-luna-purple" />
+        <Baby className="h-5 w-5 text-luna-purple" />
         <h2 className="text-xl font-bold">Health Guidelines</h2>
       </div>
       <p className="text-muted-foreground text-sm mb-6">
