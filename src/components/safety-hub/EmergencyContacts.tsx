@@ -1,19 +1,61 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { EmergencyContact, getEmergencyContacts, saveEmergencyContact, deleteEmergencyContact } from "@/lib/local-storage";
 import { Avatar } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 const EmergencyContacts = () => {
-  const [contacts, setContacts] = useState<EmergencyContact[]>(getEmergencyContacts());
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   
-  const handleAddContact = () => {
+  // Load contacts on component mount
+  useEffect(() => {
+    const loadContacts = async () => {
+      setIsLoading(true);
+      try {
+        // Try to fetch from Supabase first
+        const { data: supabaseContacts, error } = await supabase
+          .from('emergency_contacts')
+          .select('*');
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (supabaseContacts && supabaseContacts.length > 0) {
+          // Map Supabase data to our format
+          const formattedContacts = supabaseContacts.map(contact => ({
+            id: contact.id,
+            name: contact.name,
+            phone: contact.phone || undefined,
+            email: contact.email || undefined
+          }));
+          setContacts(formattedContacts);
+        } else {
+          // Fall back to local storage
+          setContacts(getEmergencyContacts());
+        }
+      } catch (error) {
+        console.error("Error loading contacts:", error);
+        // Fall back to local storage
+        setContacts(getEmergencyContacts());
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadContacts();
+  }, []);
+  
+  const handleAddContact = async () => {
     if (!name) {
       toast.error("Please enter a contact name");
       return;
@@ -24,28 +66,87 @@ const EmergencyContacts = () => {
       return;
     }
     
+    setIsLoading(true);
+    const contactId = uuidv4();
+    
     const newContact: EmergencyContact = {
-      id: Date.now().toString(),
+      id: contactId,
       name,
       phone: phone || undefined,
       email: email || undefined
     };
     
-    saveEmergencyContact(newContact);
-    setContacts(getEmergencyContacts());
-    
-    // Reset form
-    setName("");
-    setPhone("");
-    setEmail("");
-    
-    toast.success("Emergency contact added");
+    try {
+      // Try to save to Supabase first
+      const { error } = await supabase
+        .from('emergency_contacts')
+        .insert({
+          id: contactId,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          name: name,
+          phone: phone || null,
+          email: email || null
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update local state
+      setContacts(prev => [...prev, newContact]);
+      
+      // Also save to local storage as backup
+      saveEmergencyContact(newContact);
+      
+      // Reset form
+      setName("");
+      setPhone("");
+      setEmail("");
+      
+      toast.success("Emergency contact added");
+    } catch (error) {
+      console.error("Error adding contact:", error);
+      
+      // Fall back to local storage
+      saveEmergencyContact(newContact);
+      setContacts(prev => [...prev, newContact]);
+      toast.success("Contact saved locally");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleDeleteContact = (id: string) => {
-    deleteEmergencyContact(id);
-    setContacts(getEmergencyContacts());
-    toast.success("Contact removed");
+  const handleDeleteContact = async (id: string) => {
+    setIsLoading(true);
+    
+    try {
+      // Try to delete from Supabase first
+      const { error } = await supabase
+        .from('emergency_contacts')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update local state
+      setContacts(prev => prev.filter(contact => contact.id !== id));
+      
+      // Also delete from local storage
+      deleteEmergencyContact(id);
+      
+      toast.success("Contact removed");
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      
+      // Fall back to local storage
+      deleteEmergencyContact(id);
+      setContacts(prev => prev.filter(contact => contact.id !== id));
+      toast.success("Contact removed locally");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -64,6 +165,7 @@ const EmergencyContacts = () => {
             onChange={(e) => setName(e.target.value)}
             placeholder="Contact name"
             className="bg-secondary"
+            disabled={isLoading}
           />
         </div>
         
@@ -76,6 +178,7 @@ const EmergencyContacts = () => {
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Phone number"
             className="bg-secondary"
+            disabled={isLoading}
           />
         </div>
         
@@ -88,6 +191,7 @@ const EmergencyContacts = () => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email address"
             className="bg-secondary"
+            disabled={isLoading}
           />
         </div>
         
@@ -98,8 +202,9 @@ const EmergencyContacts = () => {
         <Button
           onClick={handleAddContact}
           className="w-full bg-luna-purple hover:bg-luna-purple/90 text-white"
+          disabled={isLoading}
         >
-          Add Emergency Contact
+          {isLoading ? "Adding..." : "Add Emergency Contact"}
         </Button>
       </div>
       
@@ -127,6 +232,7 @@ const EmergencyContacts = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDeleteContact(contact.id)}
+                  disabled={isLoading}
                 >
                   Remove
                 </Button>

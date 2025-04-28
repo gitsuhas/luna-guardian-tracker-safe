@@ -9,7 +9,111 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      emergency_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          relationship: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      period_data: {
+        Row: {
+          created_at: string
+          cycle_length: number
+          id: string
+          last_period_start_date: string
+          notes: string | null
+          period_length: number
+          symptoms: string[] | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          cycle_length?: number
+          id?: string
+          last_period_start_date: string
+          notes?: string | null
+          period_length?: number
+          symptoms?: string[] | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          cycle_length?: number
+          id?: string
+          last_period_start_date?: string
+          notes?: string | null
+          period_length?: number
+          symptoms?: string[] | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      sos_alerts: {
+        Row: {
+          accuracy: number | null
+          alert_message: string | null
+          created_at: string
+          id: string
+          is_resolved: boolean | null
+          latitude: number
+          longitude: number
+          resolved_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          accuracy?: number | null
+          alert_message?: string | null
+          created_at?: string
+          id?: string
+          is_resolved?: boolean | null
+          latitude: number
+          longitude: number
+          resolved_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          accuracy?: number | null
+          alert_message?: string | null
+          created_at?: string
+          id?: string
+          is_resolved?: boolean | null
+          latitude?: number
+          longitude?: number
+          resolved_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

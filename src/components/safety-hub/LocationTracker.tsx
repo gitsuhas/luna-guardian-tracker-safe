@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LocationData {
   latitude: number;
@@ -29,12 +30,32 @@ const LocationTracker = () => {
         watchId = navigator.geolocation.watchPosition(
           // For the purposes of this demo, we'll use the SRM coordinates
           // rather than the actual user location
-          (position) => {
-            setLocationData({
+          async (position) => {
+            const locationData = {
               latitude: SRM_LATITUDE,
               longitude: SRM_LONGITUDE,
               accuracy: Math.floor(Math.random() * 200) + 800  // Random accuracy between 800-1000m
-            });
+            };
+            
+            setLocationData(locationData);
+            
+            // Save location data to Supabase
+            try {
+              const { error } = await supabase.from('sos_alerts').insert({
+                user_id: (await supabase.auth.getUser()).data.user?.id,
+                latitude: locationData.latitude,
+                longitude: locationData.longitude,
+                accuracy: locationData.accuracy,
+                alert_message: "Location tracking update",
+                is_resolved: true
+              });
+              
+              if (error) {
+                console.error("Error saving location data:", error);
+              }
+            } catch (error) {
+              console.error("Error in location tracking:", error);
+            }
           },
           (error) => {
             console.error("Error getting location:", error);

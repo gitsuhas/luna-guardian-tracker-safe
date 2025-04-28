@@ -11,6 +11,7 @@ import PeriodTracking from "@/components/period-tracker/PeriodTracking";
 import SafetyGuidelines from "@/components/safety/SafetyGuidelines";
 import { PeriodData, savePeriodData, getPeriodDataList } from "@/lib/local-storage";
 import { calculatePeriodCycle, formatDateForDisplay, formatShortDate } from "@/lib/period-utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const PeriodTrackerPage = () => {
   const [lastPeriodDate, setLastPeriodDate] = useState<Date>(new Date());
@@ -20,31 +21,99 @@ const PeriodTrackerPage = () => {
   const [notes, setNotes] = useState<string>("");
   const [periodHistory, setPeriodHistory] = useState<PeriodData[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Load saved period data
   useEffect(() => {
-    const savedData = getPeriodDataList();
-    setPeriodHistory(savedData);
+    const fetchPeriodData = async () => {
+      setIsLoading(true);
+      try {
+        // First check Supabase
+        const { data: supabaseData, error } = await supabase
+          .from('period_data')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (supabaseData && supabaseData.length > 0) {
+          // If we have data in Supabase, use that
+          const formattedData = supabaseData.map(item => ({
+            id: item.id,
+            lastPeriodStartDate: item.last_period_start_date,
+            cycleLength: item.cycle_length,
+            periodLength: item.period_length,
+            symptoms: item.symptoms || [],
+            notes: item.notes || ""
+          }));
+          
+          setPeriodHistory(formattedData);
+          
+          // Set the latest period data
+          const latestData = formattedData[0];
+          setLastPeriodDate(new Date(latestData.lastPeriodStartDate));
+          setCycleLength(latestData.cycleLength);
+          setPeriodLength(latestData.periodLength);
+          setSymptoms(latestData.symptoms);
+          setNotes(latestData.notes);
+          setActiveId(latestData.id);
+        } else {
+          // Fall back to local storage
+          const savedData = getPeriodDataList();
+          setPeriodHistory(savedData);
+          
+          if (savedData.length > 0) {
+            const latestData = savedData[savedData.length - 1];
+            setLastPeriodDate(new Date(latestData.lastPeriodStartDate));
+            setCycleLength(latestData.cycleLength);
+            setPeriodLength(latestData.periodLength);
+            setSymptoms(latestData.symptoms);
+            setNotes(latestData.notes);
+            setActiveId(latestData.id);
+          } else {
+            // Create initial data if none exists
+            const newId = uuidv4();
+            setActiveId(newId);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching period data:", error);
+        toast.error("Failed to load period data");
+        
+        // Fall back to local storage
+        const savedData = getPeriodDataList();
+        setPeriodHistory(savedData);
+        
+        if (savedData.length > 0) {
+          const latestData = savedData[savedData.length - 1];
+          setLastPeriodDate(new Date(latestData.lastPeriodStartDate));
+          setCycleLength(latestData.cycleLength);
+          setPeriodLength(latestData.periodLength);
+          setSymptoms(latestData.symptoms);
+          setNotes(latestData.notes);
+          setActiveId(latestData.id);
+        } else {
+          // Create initial data if none exists
+          const newId = uuidv4();
+          setActiveId(newId);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    if (savedData.length > 0) {
-      const latestData = savedData[savedData.length - 1];
-      setLastPeriodDate(new Date(latestData.lastPeriodStartDate));
-      setCycleLength(latestData.cycleLength);
-      setPeriodLength(latestData.periodLength);
-      setSymptoms(latestData.symptoms);
-      setNotes(latestData.notes);
-      setActiveId(latestData.id);
-    } else {
-      // Create initial data if none exists
-      const newId = uuidv4();
-      setActiveId(newId);
-    }
+    fetchPeriodData();
   }, []);
   
   // Calculate next period and fertility window
   const cycleInfo = calculatePeriodCycle(lastPeriodDate, cycleLength);
   
-  const handleSavePeriodData = () => {
+  const handleSavePeriodData = async () => {
+    setIsLoading(true);
+    
+    // Create period data object
     const periodData: PeriodData = {
       id: activeId,
       lastPeriodStartDate: lastPeriodDate.toISOString(),
@@ -54,9 +123,63 @@ const PeriodTrackerPage = () => {
       notes
     };
     
-    savePeriodData(periodData);
-    setPeriodHistory(getPeriodDataList());
-    toast.success("Period data saved successfully");
+    try {
+      // Try to save to Supabase first
+      const { error } = await supabase
+        .from('period_data')
+        .upsert({
+          id: activeId,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          last_period_start_date: lastPeriodDate.toISOString(),
+          cycle_length: cycleLength,
+          period_length: periodLength,
+          symptoms: symptoms,
+          notes: notes
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Then also save to local storage as backup
+      savePeriodData(periodData);
+      
+      // Update period history
+      const { data: updatedData, error: fetchError } = await supabase
+        .from('period_data')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      if (updatedData) {
+        const formattedData = updatedData.map(item => ({
+          id: item.id,
+          lastPeriodStartDate: item.last_period_start_date,
+          cycleLength: item.cycle_length,
+          periodLength: item.period_length,
+          symptoms: item.symptoms || [],
+          notes: item.notes || ""
+        }));
+        
+        setPeriodHistory(formattedData);
+      } else {
+        setPeriodHistory(getPeriodDataList());
+      }
+      
+      toast.success("Period data saved successfully");
+    } catch (error) {
+      console.error("Error saving period data:", error);
+      
+      // Fall back to local storage only
+      savePeriodData(periodData);
+      setPeriodHistory(getPeriodDataList());
+      toast.success("Period data saved locally");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleCreateNewPeriod = () => {
@@ -87,7 +210,7 @@ const PeriodTrackerPage = () => {
               <h1 className="text-3xl font-bold">Period Tracker</h1>
               <p className="text-muted-foreground">Track your cycle, predict periods, and manage your reproductive health</p>
             </div>
-            <Button variant="outline" onClick={handleResetTracker}>Reset Tracker</Button>
+            <Button variant="outline" onClick={handleResetTracker} disabled={isLoading}>Reset Tracker</Button>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -144,13 +267,15 @@ const PeriodTrackerPage = () => {
                 <Button 
                   onClick={handleSavePeriodData}
                   className="w-full bg-luna-purple hover:bg-luna-purple/90 text-white"
+                  disabled={isLoading}
                 >
-                  Save Period Data
+                  {isLoading ? "Saving..." : "Save Period Data"}
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={handleCreateNewPeriod}
                   className="w-full"
+                  disabled={isLoading}
                 >
                   Add Another Period Date
                 </Button>
