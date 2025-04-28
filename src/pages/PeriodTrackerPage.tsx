@@ -9,6 +9,7 @@ import PeriodCalendar from "@/components/period-tracker/PeriodCalendar";
 import CycleSettings from "@/components/period-tracker/CycleSettings";
 import PeriodTracking from "@/components/period-tracker/PeriodTracking";
 import SafetyGuidelines from "@/components/safety/SafetyGuidelines";
+import HealthGuidelines from "@/components/period-tracker/HealthGuidelines";
 import { PeriodData, savePeriodData, getPeriodDataList } from "@/lib/local-storage";
 import { calculatePeriodCycle, formatDateForDisplay, formatShortDate } from "@/lib/period-utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -243,6 +244,9 @@ const PeriodTrackerPage = () => {
                   </div>
                 </div>
               </div>
+              
+              {/* Health Guidelines */}
+              <HealthGuidelines />
             </div>
             
             {/* Right column - Settings and Tracking */}
