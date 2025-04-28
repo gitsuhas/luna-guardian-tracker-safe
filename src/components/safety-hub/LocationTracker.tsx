@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 interface LocationData {
   latitude: number;
@@ -41,8 +42,12 @@ const LocationTracker = () => {
             
             // Save location data to Supabase
             try {
+              // Generate a proper UUID for anonymous users
+              const userData = await supabase.auth.getUser();
+              const userId = userData.data.user?.id || uuidv4();
+              
               const { error } = await supabase.from('sos_alerts').insert({
-                user_id: (await supabase.auth.getUser()).data.user?.id,
+                user_id: userId,
                 latitude: locationData.latitude,
                 longitude: locationData.longitude,
                 accuracy: locationData.accuracy,

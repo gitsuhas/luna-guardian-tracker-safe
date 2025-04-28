@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { addDays, format } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
@@ -8,7 +7,6 @@ import Navbar from "@/components/layout/Navbar";
 import PeriodCalendar from "@/components/period-tracker/PeriodCalendar";
 import CycleSettings from "@/components/period-tracker/CycleSettings";
 import PeriodTracking from "@/components/period-tracker/PeriodTracking";
-import SafetyGuidelines from "@/components/safety/SafetyGuidelines";
 import HealthGuidelines from "@/components/period-tracker/HealthGuidelines";
 import { PeriodData, savePeriodData, getPeriodDataList } from "@/lib/local-storage";
 import { calculatePeriodCycle, formatDateForDisplay, formatShortDate } from "@/lib/period-utils";
@@ -24,12 +22,10 @@ const PeriodTrackerPage = () => {
   const [activeId, setActiveId] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
-  // Load saved period data
   useEffect(() => {
     const fetchPeriodData = async () => {
       setIsLoading(true);
       try {
-        // First check Supabase
         const { data: supabaseData, error } = await supabase
           .from('period_data')
           .select('*')
@@ -40,7 +36,6 @@ const PeriodTrackerPage = () => {
         }
         
         if (supabaseData && supabaseData.length > 0) {
-          // If we have data in Supabase, use that
           const formattedData = supabaseData.map(item => ({
             id: item.id,
             lastPeriodStartDate: item.last_period_start_date,
@@ -52,7 +47,6 @@ const PeriodTrackerPage = () => {
           
           setPeriodHistory(formattedData);
           
-          // Set the latest period data
           const latestData = formattedData[0];
           setLastPeriodDate(new Date(latestData.lastPeriodStartDate));
           setCycleLength(latestData.cycleLength);
@@ -61,7 +55,6 @@ const PeriodTrackerPage = () => {
           setNotes(latestData.notes);
           setActiveId(latestData.id);
         } else {
-          // Fall back to local storage
           const savedData = getPeriodDataList();
           setPeriodHistory(savedData);
           
@@ -74,7 +67,6 @@ const PeriodTrackerPage = () => {
             setNotes(latestData.notes);
             setActiveId(latestData.id);
           } else {
-            // Create initial data if none exists
             const newId = uuidv4();
             setActiveId(newId);
           }
@@ -83,7 +75,6 @@ const PeriodTrackerPage = () => {
         console.error("Error fetching period data:", error);
         toast.error("Failed to load period data");
         
-        // Fall back to local storage
         const savedData = getPeriodDataList();
         setPeriodHistory(savedData);
         
@@ -96,7 +87,6 @@ const PeriodTrackerPage = () => {
           setNotes(latestData.notes);
           setActiveId(latestData.id);
         } else {
-          // Create initial data if none exists
           const newId = uuidv4();
           setActiveId(newId);
         }
@@ -108,13 +98,11 @@ const PeriodTrackerPage = () => {
     fetchPeriodData();
   }, []);
   
-  // Calculate next period and fertility window
   const cycleInfo = calculatePeriodCycle(lastPeriodDate, cycleLength);
   
   const handleSavePeriodData = async () => {
     setIsLoading(true);
     
-    // Create period data object
     const periodData: PeriodData = {
       id: activeId,
       lastPeriodStartDate: lastPeriodDate.toISOString(),
@@ -125,7 +113,6 @@ const PeriodTrackerPage = () => {
     };
     
     try {
-      // Try to save to Supabase first
       const { error } = await supabase
         .from('period_data')
         .upsert({
@@ -142,10 +129,8 @@ const PeriodTrackerPage = () => {
         throw error;
       }
       
-      // Then also save to local storage as backup
       savePeriodData(periodData);
       
-      // Update period history
       const { data: updatedData, error: fetchError } = await supabase
         .from('period_data')
         .select('*')
@@ -174,7 +159,6 @@ const PeriodTrackerPage = () => {
     } catch (error) {
       console.error("Error saving period data:", error);
       
-      // Fall back to local storage only
       savePeriodData(periodData);
       setPeriodHistory(getPeriodDataList());
       toast.success("Period data saved locally");
@@ -215,7 +199,6 @@ const PeriodTrackerPage = () => {
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left column - Calendar and Predictions */}
             <div className="lg:col-span-2 space-y-6">
               <PeriodCalendar 
                 lastPeriodDate={lastPeriodDate}
@@ -245,11 +228,9 @@ const PeriodTrackerPage = () => {
                 </div>
               </div>
               
-              {/* Health Guidelines */}
               <HealthGuidelines />
             </div>
             
-            {/* Right column - Settings and Tracking */}
             <div className="space-y-6">
               <CycleSettings
                 lastPeriodDate={lastPeriodDate}
@@ -287,7 +268,6 @@ const PeriodTrackerPage = () => {
             </div>
           </div>
           
-          {/* Period History Display */}
           {periodHistory.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-bold mb-4">Period History</h2>
@@ -328,10 +308,6 @@ const PeriodTrackerPage = () => {
               </div>
             </div>
           )}
-          
-          <div className="mt-8">
-            <SafetyGuidelines />
-          </div>
         </div>
       </main>
     </div>

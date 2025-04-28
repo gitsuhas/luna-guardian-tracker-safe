@@ -5,6 +5,7 @@ import EmergencyAlert from "@/components/safety-hub/EmergencyAlert";
 import FakeCallGenerator from "@/components/safety-hub/FakeCallGenerator";
 import EmergencyContacts from "@/components/safety-hub/EmergencyContacts";
 import LocationTracker from "@/components/safety-hub/LocationTracker";
+import SafetyGuidelines from "@/components/safety/SafetyGuidelines";
 
 const SafetyHubPage = () => {
   return (
@@ -25,6 +26,10 @@ const SafetyHubPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <EmergencyAlert />
                 <LocationTracker />
+              </div>
+              
+              <div className="mt-6">
+                <SafetyGuidelines />
               </div>
             </TabsContent>
             

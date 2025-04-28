@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { getEmergencyContacts } from "@/lib/local-storage";
 import { AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 const EmergencyAlert = () => {
   const [emergencyMessage, setEmergencyMessage] = useState(
@@ -52,8 +53,8 @@ const EmergencyAlert = () => {
               const SRM_LATITUDE = 12.8230;
               const SRM_LONGITUDE = 80.0444;
               
-              // Get current user ID or generate a unique ID for non-authenticated users
-              const userId = (await supabase.auth.getUser()).data.user?.id || `anon-${Date.now()}`;
+              // Generate a proper UUID for the user
+              const userId = (await supabase.auth.getUser()).data.user?.id || uuidv4();
               
               // Save SOS alert to Supabase
               const { error: sosError } = await supabase
